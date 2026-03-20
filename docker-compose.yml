@@ -1,0 +1,47 @@
+services:
+
+  # ── ChromaDB vector store ──────────────────────────────────────────────────
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: resume_chromadb
+    restart: unless-stopped
+    ports:
+      - "${CHROMA_PORT:-8001}:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_AUTHN_CREDENTIALS=${CHROMA_SERVER_TOKEN:-}
+      - CHROMA_SERVER_AUTHN_PROVIDER=${CHROMA_AUTH_PROVIDER:-}
+      - ANONYMIZED_TELEMETRY=false
+
+  # ── Resume Pipeline API ────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: resume_api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - API_RELOAD=false
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      - chromadb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  chroma_data:
+    driver: local
+  uploads_data:
+    driver: local

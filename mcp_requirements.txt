@@ -1,0 +1,7 @@
+# Resume Pipeline — MCP Server Dependencies
+# Install separately from the main requirements:
+#   pip install -r mcp_requirements.txt
+
+mcp[cli]>=1.0.0
+httpx>=0.27.0
+python-dotenv>=1.0.0

@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "resume-pipeline"
+version = "2.0.0"
+description = "Resume ingestion, extraction, and semantic search with LangGraph."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+dependencies = [
+    # ── LangChain ecosystem ────────────────────────────────────────────────
+    "langchain>=0.2.0",
+    "langchain-community>=0.2.0",
+    "langchain-openai>=0.1.0",
+
+    # ── LangGraph ──────────────────────────────────────────────────────────
+    "langgraph>=0.1.0",
+
+    # ── Vector store ───────────────────────────────────────────────────────
+    "chromadb>=0.5.0",
+
+    # ── Document loaders ───────────────────────────────────────────────────
+    "pypdf>=4.0.0",
+    "docx2txt>=0.8",
+
+    # ── API ────────────────────────────────────────────────────────────────
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
+    "aiofiles>=23.0.0",
+
+    # ── Data validation ────────────────────────────────────────────────────
+    "pydantic>=2.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",       # async test client for FastAPI
+    "ruff>=0.4.0",         # linter + formatter
+    "mypy>=1.10.0",        # type checker
+]
+
+[project.scripts]
+resume-cli = "src.drivers.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+# ── Ruff ───────────────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+# ── Mypy ───────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+# ── Pytest ─────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
