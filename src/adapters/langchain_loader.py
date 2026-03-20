@@ -16,11 +16,22 @@ from langchain_community.document_loaders import (
     TextLoader,
 )
 
-from src.domain.config import SUPPORTED_EXTENSIONS
 from src.ports.document_loader import DocumentLoader, RawDocument
 
 
 class LangChainDocumentLoader(DocumentLoader):
+    """Load documents using LangChain loaders (.pdf, .docx, .txt)."""
+
+    def __init__(
+        self,
+        supported_extensions: set = None,
+    ) -> None:
+        """Initialize with supported file extensions.
+        
+        Args:
+            supported_extensions: Set of allowed extensions (default: {.pdf, .docx, .txt})
+        """
+        self._supported_extensions = supported_extensions or {".pdf", ".docx", ".txt"}
 
     def load(self, file_path: str) -> List[RawDocument]:
         path = Path(file_path)
@@ -29,10 +40,10 @@ class LangChainDocumentLoader(DocumentLoader):
             raise FileNotFoundError(f"File not found: {file_path}")
 
         ext = path.suffix.lower()
-        if ext not in SUPPORTED_EXTENSIONS:
+        if ext not in self._supported_extensions:
             raise ValueError(
                 f"Unsupported extension '{ext}'. "
-                f"Accepted: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+                f"Accepted: {', '.join(sorted(self._supported_extensions))}"
             )
 
         _loaders = {

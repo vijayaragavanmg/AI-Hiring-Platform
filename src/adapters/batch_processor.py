@@ -16,7 +16,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from src.domain.config import BATCH_MAX_WORKERS, SUPPORTED_EXTENSIONS
 from src.domain.entities import BatchSummary, ProcessingResult
 from src.adapters.langgraph_pipeline import LangGraphPipeline
 
@@ -32,11 +31,20 @@ class BatchProcessor:
 
     def __init__(
         self,
-        pipeline:    LangGraphPipeline,
-        max_workers: int = BATCH_MAX_WORKERS,
+        pipeline: LangGraphPipeline,
+        max_workers: int = 4,
+        supported_extensions: set = None,
     ) -> None:
-        self._pipeline    = pipeline
+        """Initialize batch processor with pipeline and thread pool size.
+        
+        Args:
+            pipeline: LangGraphPipeline instance
+            max_workers: Thread pool size (default: 4)
+            supported_extensions: Set of allowed file extensions (default: {.pdf, .docx, .txt})
+        """
+        self._pipeline = pipeline
         self._max_workers = max_workers
+        self._supported_extensions = supported_extensions or {".pdf", ".docx", ".txt"}
 
     # ── File discovery ─────────────────────────────────────────────────────
 
@@ -49,10 +57,10 @@ class BatchProcessor:
         for p in paths:
             path = Path(p)
             if path.is_dir():
-                for ext in SUPPORTED_EXTENSIONS:
+                for ext in self._supported_extensions:
                     collected.extend(str(f) for f in path.rglob(f"*{ext}"))
             elif path.is_file():
-                if path.suffix.lower() in SUPPORTED_EXTENSIONS:
+                if path.suffix.lower() in self._supported_extensions:
                     collected.append(str(path))
                 else:
                     log.warning("Skipping unsupported file: %s", path)

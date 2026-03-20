@@ -14,7 +14,6 @@ from typing import List, Optional
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from src.domain.config import CHUNK_OVERLAP, CHUNK_SIZE
 from src.domain.entities import ResumeData
 from src.ports.chuncker import Chunker
 from src.ports.document_loader import RawDocument
@@ -25,9 +24,15 @@ class SectionChunker(Chunker):
 
     def __init__(
         self,
-        chunk_size:    int = CHUNK_SIZE,
-        chunk_overlap: int = CHUNK_OVERLAP,
+        chunk_size: int = 500,
+        chunk_overlap: int = 50,
     ) -> None:
+        """Initialize with chunk size and overlap.
+        
+        Args:
+            chunk_size: Size of text chunks (default: 500)
+            chunk_overlap: Overlap between chunks (default: 50)
+        """
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,

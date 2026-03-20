@@ -49,12 +49,6 @@ from langchain.embeddings.base import Embeddings
 from langchain_core.documents import Document as LCDocument
 from langchain_community.vectorstores import Chroma
 
-from src.domain.config import (
-    CHROMA_COLLECTION,
-    CHROMA_HOST,
-    CHROMA_PORT,
-    CHROMA_SERVER_TOKEN,
-)
 from src.ports.vector_store import Chunk, SearchResult, VectorStore
 
 log = logging.getLogger(__name__)
@@ -71,15 +65,24 @@ class ChromaHttpVectorStore(VectorStore):
 
     def __init__(
         self,
-        embedder:        Embeddings,
-        host:            str = CHROMA_HOST,
-        port:            int = CHROMA_PORT,
-        collection_name: str = CHROMA_COLLECTION,
-        server_token:    str = CHROMA_SERVER_TOKEN,
+        embedder: Embeddings,
+        host: str = "localhost",
+        port: int = 8001,
+        collection_name: str = "resumes",
+        server_token: str = "",
     ) -> None:
-        self._embedder        = embedder
+        """Initialize ChromaDB HTTP client.
+        
+        Args:
+            embedder: LangChain Embeddings instance
+            host: ChromaDB server host (default: localhost)
+            port: ChromaDB server port (default: 8001)
+            collection_name: Chroma collection name (default: resumes)
+            server_token: ChromaDB auth token (default: empty)
+        """
+        self._embedder = embedder
         self._collection_name = collection_name
-        self._client          = self._build_client(host, port, server_token)
+        self._client = self._build_client(host, port, server_token)
 
         log.info(
             "ChromaHttpVectorStore → http://%s:%s  collection=%s  embedder=%s",

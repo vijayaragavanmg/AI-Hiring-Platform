@@ -39,13 +39,20 @@ from src.adapters import (
     GeminiLLMExtractor,
     SectionChunker,
 )
-from src.domain.config import (
+from src.drivers.config import (
+    BATCH_MAX_WORKERS,
     CHROMA_COLLECTION,
     CHROMA_HOST,
     CHROMA_PORT,
     CHROMA_SERVER_TOKEN,
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    GEMINI_API_KEY,
     GEMINI_EMBEDDING_MODEL,
+    GEMINI_LLM_MODEL,
+    GEMINI_LLM_TEMPERATURE,
     LOG_LEVEL,
+    SUPPORTED_EXTENSIONS,
 )
 
 logging.basicConfig(
@@ -59,18 +66,28 @@ log = logging.getLogger(__name__)
 def _build_pipeline() -> LangGraphPipeline:
     """Construct the same adapter stack used by the API server."""
     vector_store = ChromaHttpVectorStore(
-        embedder=        GoogleGenerativeAIEmbeddings(model=GEMINI_EMBEDDING_MODEL),
-        host=            CHROMA_HOST,
-        port=            CHROMA_PORT,
-        collection_name= CHROMA_COLLECTION,
-        server_token=    CHROMA_SERVER_TOKEN,
+        embedder=GoogleGenerativeAIEmbeddings(model=GEMINI_EMBEDDING_MODEL),
+        host=CHROMA_HOST,
+        port=CHROMA_PORT,
+        collection_name=CHROMA_COLLECTION,
+        server_token=CHROMA_SERVER_TOKEN,
     )
 
     return LangGraphPipeline(
-        loader=       LangChainDocumentLoader(),
-        extractor=    GeminiLLMExtractor(),
-        chunker=      SectionChunker(),
-        vector_store= vector_store,
+        loader=LangChainDocumentLoader(
+            supported_extensions=set(SUPPORTED_EXTENSIONS),
+        ),
+        extractor=GeminiLLMExtractor(
+            api_key=GEMINI_API_KEY,
+            model=GEMINI_LLM_MODEL,
+            temperature=GEMINI_LLM_TEMPERATURE,
+        ),
+        chunker=SectionChunker(
+            chunk_size=CHUNK_SIZE,
+            chunk_overlap=CHUNK_OVERLAP,
+        ),
+        vector_store=vector_store,
+        supported_extensions=set(SUPPORTED_EXTENSIONS),
     )
 
 

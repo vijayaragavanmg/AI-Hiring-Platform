@@ -7,32 +7,36 @@ Every other layer imports from here — nothing here imports from them.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
-
-from pydantic import BaseModel, Field
 
 
 # ── Value objects ──────────────────────────────────────────────────────────
 
-class JobEntry(BaseModel):
+@dataclass
+class JobEntry:
     """A single role in the candidate's work history."""
-    company: str = Field(description="Company or organisation name")
-    title: str = Field(description="Job title or role")
-    start_date: str = Field(description="Start date, e.g. 'Jan 2020'")
-    end_date: str = Field(description="End date or 'Present'")
-    responsibilities: List[str] = Field(description="Key responsibilities / achievements")
+    company: str
+    title: str
+    start_date: str
+    end_date: str
+    responsibilities: List[str]
 
-class ResumeData(BaseModel):
+
+@dataclass
+class ResumeData:
     """Structured fields extracted from a resume."""
-    name: str = Field(description="Full name of the candidate")
-    email: Optional[str] = Field(default=None, description="Email address")
-    phone: Optional[str] = Field(default=None, description="Phone number")
-    summary: str = Field(description="Professional summary or objective")
-    skills: List[str] = Field(description="Technical and soft skills")
-    job_history: List[JobEntry] = Field(description="Work experience in reverse chronological order")
-    education: List[str] = Field(default_factory=list, description="Degrees, institutions, years")
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    summary: str = ""
+    skills: List[str] = field(default_factory=list)
+    job_history: List[JobEntry] = field(default_factory=list)
+    education: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 # ── Result objects ─────────────────────────────────────────────────────────
 

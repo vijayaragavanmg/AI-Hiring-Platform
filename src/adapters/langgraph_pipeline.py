@@ -18,7 +18,6 @@ from pathlib import Path
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from src.domain.config import SUPPORTED_EXTENSIONS, VECTORSTORE_PATH
 from src.domain.entities import ProcessingResult, ResumeData
 from src.domain.pipeline_state import ResumeState
 from src.ports.chuncker import Chunker
@@ -40,30 +39,46 @@ class LangGraphPipeline:
 
     def __init__(
         self,
-        loader:       DocumentLoader,
-        extractor:    LLMExtractor,
-        chunker:      Chunker,
+        loader: DocumentLoader,
+        extractor: LLMExtractor,
+        chunker: Chunker,
         vector_store: VectorStore,
+        supported_extensions: set = None,
     ) -> None:
-        self._loader       = loader
-        self._extractor    = extractor
-        self._chunker      = chunker
+        """Initialize pipeline with port implementations.
+        
+        Args:
+            loader: DocumentLoader implementation
+            extractor: LLMExtractor implementation
+            chunker: Chunker implementation
+            vector_store: VectorStore implementation
+            supported_extensions: Set of allowed file extensions (default: {.pdf, .docx, .txt})
+        """
+        self._loader = loader
+        self._extractor = extractor
+        self._chunker = chunker
         self._vector_store = vector_store
-        self._graph        = self._build()
+        self._supported_extensions = supported_extensions or {".pdf", ".docx", ".txt"}
+        self._graph = self._build()
 
     # ── Public entry point ─────────────────────────────────────────────────
 
     def process(
         self,
-        file_path:        str,
-        vectorstore_path: str = str(VECTORSTORE_PATH),
+        file_path: str,
+        vectorstore_path: str = "./resume_chroma_db",
     ) -> ProcessingResult:
-        """
-        Run the full pipeline for one resume file.
-        Always returns a ProcessingResult — never raises.
+        """Run the full pipeline for one resume file.
+        
+        Args:
+            file_path: Path to resume file
+            vectorstore_path: Path to vectorstore (default: ./resume_chroma_db)
+        
+        Returns:
+            ProcessingResult with success/failure details
         """
         start = time.time()
-        path  = Path(file_path)
+        path = Path(file_path)
 
         if not path.exists():
             return ProcessingResult(
@@ -72,13 +87,13 @@ class LangGraphPipeline:
                 error=f"File not found: {file_path}",
             )
 
-        if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+        if path.suffix.lower() not in self._supported_extensions:
             return ProcessingResult(
                 file_path=file_path,
                 success=False,
                 error=(
                     f"Unsupported extension '{path.suffix}'. "
-                    f"Accepted: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+                    f"Accepted: {', '.join(sorted(self._supported_extensions))}"
                 ),
             )
 

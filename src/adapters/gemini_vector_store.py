@@ -22,7 +22,6 @@ from langchain_core.documents import Document as LCDocument
 from langchain_community.vectorstores import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-from src.domain.config import GEMINI_API_KEY, GEMINI_EMBEDDING_MODEL, VECTORSTORE_PATH
 from src.ports.vector_store import Chunk, SearchResult, VectorStore
 
 
@@ -30,13 +29,22 @@ class GeminiVectorStore(VectorStore):
 
     def __init__(
         self,
-        persist_dir:     str = str(VECTORSTORE_PATH),
-        embedding_model: str = GEMINI_EMBEDDING_MODEL
+        api_key: str,
+        embedding_model: str = "gemini-embedding-2-preview",
+        persist_dir: str = "./resume_chroma_db",
     ) -> None:
+        """Initialize Gemini vector store.
+        
+        Args:
+            api_key: Google Gemini API key (required)
+            embedding_model: Gemini embedding model (default: gemini-embedding-2-preview)
+            persist_dir: Persistency directory for Chroma (default: ./resume_chroma_db)
+        """
         self._persist_dir = persist_dir
-        self._embedder    = GoogleGenerativeAIEmbeddings(
+        self._embedder = GoogleGenerativeAIEmbeddings(
+            api_key=api_key,
             model=embedding_model,
-            task_type="retrieval_document",   # optimised for semantic search
+            task_type="retrieval_document",  # optimised for semantic search
         )
 
     # ── VectorStore interface ──────────────────────────────────────────────

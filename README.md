@@ -23,9 +23,10 @@ The dependency rule is strictly inward: `drivers → adapters → ports → doma
 - **Single resume upload** — async (background) or sync
 - **Batch processing** — parallel ingestion via `ThreadPoolExecutor`
 - **LLM extraction** — structured JSON extraction of name, summary, skills, job history, education
-- **Multiple LLM providers** — OpenAI (`gpt-4o-mini`) or Google Gemini (`gemini-1.5-flash`)
-- **Multiple embedding providers** — OpenAI, Gemini, or HuggingFace (local, free)
+- **Multiple LLM providers** — OpenAI (`gpt-4o-mini`) or Google Gemini (`gemini-2.5-flash-lite`)
+- **Multiple embedding providers** — OpenAI, Gemini, or local cross-encoder (free)
 - **Vector store** — section-aware chunking with rich metadata, persisted to ChromaDB
+- **Semantic reranking** — Cohere cloud reranker or local cross-encoder for ranking search results
 - **ChromaDB HTTP client** — connects to a remote ChromaDB server (Docker / production)
 - **Semantic search** — full-text, by section, by candidate, by skill, by experience
 - **Job polling** — async job status via in-memory repository (swap to Redis/SQL with one-line change)
@@ -54,9 +55,8 @@ resume-pipeline/
 └── src/
     │
     ├── domain/
-    │   ├── entities.py         # JobEntry, ResumeData, ProcessingResult, BatchSummary
-    │   ├── pipeline_state.py   # LangGraph ResumeState (TypedDict)
-    │   └── config.py           # All settings loaded from .env
+    │   ├── entities.py         # JobEntry, ResumeData, ProcessingResult, BatchSummary (@dataclass, no Pydantic)
+    │   └── pipeline_state.py   # LangGraph ResumeState (TypedDict)
     │
     ├── ports/
     │   ├── document_loader.py  # DocumentLoader ABC + RawDocument
@@ -71,20 +71,22 @@ resume-pipeline/
     │   ├── gemini_extractor.py         # LLMExtractor → ChatGoogleGenerativeAI
     │   ├── section_chunker.py          # Chunker → section-aware + sliding-window fallback
     │   ├── chroma_http_store.py        # VectorStore → ChromaDB HTTP client (production)
-    │   ├── chroma_store.py             # VectorStore → ChromaDB local embedded (dev)
+    │   ├── openai_vector_store.py      # VectorStore → Chroma + OpenAI embeddings
     │   ├── gemini_vector_store.py      # VectorStore → Chroma + Google embeddings
-    │   ├── huggingface_vector_store.py # VectorStore → Chroma + local HuggingFace model
+    │   ├── cohere_reranker.py          # Reranker → Cohere cloud reranker (best quality)
     │   ├── in_memory_job_repo.py       # JobRepository → plain dict (swap for Redis/SQL)
     │   ├── langgraph_pipeline.py       # Wires all ports into a LangGraph StateGraph
+    │   ├── retrieval_pipeline.py       # Search + retrieval with semantic ranking
     │   └── batch_processor.py          # Fans out pipeline.process() via ThreadPoolExecutor
     │
     └── drivers/
+        ├── config.py           # All settings loaded from .env (single source of truth)
         ├── cli.py              # CLI entry point for batch processing
         └── api/
             ├── app.py          # FastAPI factory (create_app)
-            ├── dependencies.py # @lru_cache singletons + request helpers
+            ├── dependencies.py # @lru_cache singletons + request helpers + dependency injection
             ├── job_runner.py   # Background task runners (single + batch)
-            ├── schemas.py      # Pydantic request/response models
+            ├── schemas.py      # Pydantic DTO models (request/response validation), separate from domain
             └── routes/
                 ├── resumes.py    # POST /resumes/upload, /upload/sync
                 ├── batch.py      # POST /resumes/batch, GET /batch/{id}
@@ -273,66 +275,160 @@ python -m src.drivers.cli cv1.pdf cv2.docx cv3.txt
 
 | Adapter | Model | Cost | Privacy | Quality |
 |---------|-------|------|---------|---------|
-| `ChromaHttpVectorStore` | OpenAI `text-embedding-3-small` | Paid | Cloud | Excellent |
-| `GeminiVectorStore` | `models/text-embedding-004` | Paid | Cloud | Excellent |
-| `HuggingFaceVectorStore` | `BAAI/bge-large-en-v1.5` | Free | Local | Excellent |
+| `OpenAIVectorStore` | `text-embedding-3-small` | Paid | Cloud | Excellent |
+| `GeminiVectorStore` | `gemini-embedding-2-preview` | Paid | Cloud | Excellent |
 
 Swap embedding provider in `src/drivers/api/dependencies.py`:
 
 ```python
-# Free, local, private
-from src.adapters import HuggingFaceVectorStore
+# Example: switch to Gemini embeddings
+from src.adapters import GeminiVectorStore
 
 @lru_cache(maxsize=1)
-def get_vector_store() -> HuggingFaceVectorStore:
-    return HuggingFaceVectorStore()
+def get_vector_store() -> GeminiVectorStore:
+    return GeminiVectorStore()
 ```
 
 ---
 
 ## Swapping adapters
 
-Every adapter is injected via `src/drivers/api/dependencies.py`. To swap any implementation, change one line there:
+Every adapter is injected via `src/drivers/api/dependencies.py` with constructor parameters. To swap any implementation, update the dependency:
 
 ```python
 # Example: swap LLM extractor from OpenAI to Gemini
 from src.adapters import GeminiLLMExtractor
+from src.drivers.config import GEMINI_API_KEY, GEMINI_LLM_MODEL, GEMINI_LLM_TEMPERATURE
 
 @lru_cache(maxsize=1)
 def get_pipeline() -> LangGraphPipeline:
     return LangGraphPipeline(
         loader=       LangChainDocumentLoader(),
-        extractor=    GeminiLLMExtractor(),       # ← changed
+        extractor=    GeminiLLMExtractor(api_key=GEMINI_API_KEY, model=GEMINI_LLM_MODEL, temperature=GEMINI_LLM_TEMPERATURE),  # ← changed
         chunker=      SectionChunker(),
         vector_store= get_vector_store(),
     )
 ```
 
+**Key principle:** Configuration is injected as constructor parameters, not imported as module-level constants. This makes testing easy (mock any adapter) and swapping providers trivial.
+
+---
+
+## Architecture patterns
+
+### Clean Architecture (Ports & Adapters)
+
+The project follows strict unidirectional dependencies:
+
+```
+drivers  →  adapters  →  ports  →  domain
+```
+
+- **domain/** — Pure Python, no external dependencies, no I/O, no frameworks. Only business logic.
+- **ports/** — Interface contracts (ABCs) that domain depends on.
+- **adapters/** — Concrete implementations (OpenAI, Gemini, ChromaDB, etc.). Zero config imports; config injected via constructor.
+- **drivers/** — Entry points (HTTP, CLI, config). Dependency injection wiring here.
+
+### Constructor Injection (No Config Imports in Adapters)
+
+Configuration flows **into** adapters, not **from** them:
+
+```python
+# ❌ Bad: adapter imports config
+class OpenAILLMExtractor:
+    def __init__(self):
+        from src.drivers.config import OPENAI_API_KEY  # Tight coupling
+
+# ✅ Good: adapter receives config
+class OpenAILLMExtractor:
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+        self.api_key = api_key
+        self.model = model
+```
+
+Benefits:
+- **Testability**: Mock any config value in tests
+- **Portability**: No module-level side effects
+- **Flexibility**: Use same adapter with different configs
+
+### Domain Entities as Pure `@dataclass`
+
+Domain entities are framework-free Python dataclasses:
+
+```python
+@dataclass
+class ResumeData:
+    name: str
+    email: Optional[str] = None
+    summary: str = ""
+    skills: List[str] = field(default_factory=list)
+    job_history: List[JobEntry] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dict for boundary crossing."""
+        return asdict(self)
+```
+
+### DTO Layer (Pydantic at API Boundary Only)
+
+HTTP request/response validation is **separate** from domain entities:
+
+```python
+# Domain (pure, no Pydantic)
+@dataclass
+class ResumeData:
+    name: str
+    summary: str
+
+# API (Pydantic DTOs)
+class ResumeDataSchema(BaseModel):  # ← Pydantic here
+    name: str
+    summary: str
+
+# Conversion at route boundary
+@router.post("/resumes/upload/sync")
+async def upload_resume_sync(pipeline) -> ResumeResponse:
+    result = pipeline.process(...)
+    return ResumeResponse(
+        candidate=ResumeDataSchema(**result.resume_data.to_dict()),  # ← Explicit conversion
+        ...
+    )
+```
+
+Benefits:
+- **Decoupling**: Swap Pydantic for another validator without touching domain
+- **API flexibility**: DTOs can differ from domain models
+- **Defensive**: `OPT Optional[ResumeDataSchema] = None` prevents API crashes
+
 ---
 
 ## Configuration reference
 
-All settings are loaded from `.env` via `src/domain/config.py`.
+All settings are loaded from `.env` via `src/drivers/config.py` (the only place where environment variables are accessed).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OPENAI_API_KEY` | — | OpenAI API key (required for OpenAI adapters) |
+| `OPENAI_LLM_MODEL` | `gpt-4o-mini` | OpenAI model for extraction |
+| `OPENAI_LLM_TEMPERATURE` | `0` | OpenAI LLM sampling temperature |
+| `OPEN_AI_EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
 | `GEMINI_API_KEY` | — | Google Gemini API key (required for Gemini adapters) |
-| `LLM_MODEL` | `gpt-4o-mini` | OpenAI model for extraction |
-| `LLM_TEMPERATURE` | `0` | LLM sampling temperature |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
-| `GEMINI_LLM_MODEL` | `gemini-1.5-flash` | Gemini model for extraction |
-| `GEMINI_EMBEDDING_MODEL` | `models/text-embedding-004` | Gemini embedding model |
-| `HF_EMBEDDING_MODEL` | `BAAI/bge-large-en-v1.5` | HuggingFace embedding model |
-| `HF_EMBEDDING_DEVICE` | `cpu` | Device for HuggingFace (`cpu`, `cuda`, `mps`) |
+| `GEMINI_LLM_MODEL` | `gemini-2.5-flash-lite` | Gemini model for extraction |
+| `GEMINI_LLM_TEMPERATURE` | `0` | Gemini LLM sampling temperature |
+| `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-2-preview` | Gemini embedding model |
+| `COHERE_API_KEY` | — | Cohere API key (required for Cohere reranker) |
+| `COHERE_RERANK_MODEL` | `rerank-english-v3.0` | Cohere reranking model |
+| `CROSS_ENCODER_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Local cross-encoder reranker (free) |
+| `CROSS_ENCODER_DEVICE` | `cpu` | Device for cross-encoder (`cpu`, `cuda`, `mps`) |
+| `RERANK_FETCH_K` | `20` | Overfetch multiplier: candidates retrieved before reranking |
 | `CHROMA_HOST` | `localhost` | ChromaDB server host |
 | `CHROMA_PORT` | `8001` | ChromaDB server port |
 | `CHROMA_COLLECTION` | `resumes` | Chroma collection name |
 | `CHROMA_SERVER_TOKEN` | — | ChromaDB auth token (leave blank to disable) |
 | `UPLOAD_DIR` | `./uploads` | Uploaded file storage |
 | `VECTORSTORE_PATH` | `./resume_chroma_db` | Local Chroma path (non-Docker only) |
-| `CHUNK_SIZE` | `500` | Fallback text splitter chunk size |
-| `CHUNK_OVERLAP` | `50` | Fallback text splitter overlap |
+| `CHUNK_SIZE` | `500` | Text splitter chunk size |
+| `CHUNK_OVERLAP` | `50` | Text splitter overlap |
 | `BATCH_MAX_WORKERS` | `4` | Thread pool size for batch processing |
 | `BATCH_MAX_FILES` | `50` | Max files per batch request |
 | `API_HOST` | `0.0.0.0` | API server bind host |
@@ -367,4 +463,4 @@ pipeline = LangGraphPipeline(
 - Python 3.11+
 - Docker + Docker Compose (for containerised deployment)
 - At least one LLM provider key: `OPENAI_API_KEY` or `GEMINI_API_KEY`
-- HuggingFace embeddings run locally — no key needed, model downloads on first run
+- At least one embedding provider: OpenAI (paid), Gemini (paid), or local cross-encoder (free)

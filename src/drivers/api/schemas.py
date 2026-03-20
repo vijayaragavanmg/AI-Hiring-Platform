@@ -11,21 +11,39 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
-from src.domain.entities import ResumeData
+
+# ── Resume model schemas (API DTOs) ─────────────────────────────────────────
+
+class JobEntrySchema(BaseModel):
+    company: str
+    title: str
+    start_date: str
+    end_date: str
+    responsibilities: List[str]
+
+
+class ResumeDataSchema(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    summary: str
+    skills: List[str] = []
+    job_history: List[JobEntrySchema] = []
+    education: List[str] = []
 
 
 # ── Resume upload ──────────────────────────────────────────────────────────
 
 class UploadResponse(BaseModel):
-    job_id:    str
+    job_id: str
     file_name: str
-    message:   str
+    message: str
 
 
 class ResumeResponse(BaseModel):
-    job_id:           str
-    candidate:        ResumeData
-    chunks_stored:    int
+    job_id: str
+    candidate: Optional[ResumeDataSchema] = None
+    chunks_stored: int
     duration_seconds: float
 
 

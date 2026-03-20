@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 
 from src.adapters import LangGraphPipeline
-from src.domain.config import UPLOAD_DIR, VECTORSTORE_PATH
+from src.drivers.config import UPLOAD_DIR, VECTORSTORE_PATH
 from src.drivers.api.dependencies import (
     get_job_repo,
     get_pipeline,
@@ -17,7 +17,7 @@ from src.drivers.api.dependencies import (
     validate_extension,
 )
 from src.drivers.api.job_runner import run_single_job
-from src.drivers.api.schemas import ResumeResponse, UploadResponse
+from src.drivers.api.schemas import ResumeDataSchema, ResumeResponse, UploadResponse
 from src.ports.job_repository import Job, JobRepository
 
 router = APIRouter(prefix="/resumes", tags=["Resumes"])
@@ -91,7 +91,7 @@ async def upload_resume_sync(
 
     return ResumeResponse(
         job_id=job_id,
-        candidate=result.resume_data,
+        candidate=ResumeDataSchema(**result.resume_data.to_dict()) if result.resume_data else None,
         chunks_stored=result.chunks_count,
         duration_seconds=result.duration_seconds,
     )

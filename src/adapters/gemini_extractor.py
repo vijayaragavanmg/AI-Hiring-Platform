@@ -21,7 +21,6 @@ import logging
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from src.domain.config import GEMINI_API_KEY, GEMINI_LLM_MODEL, GEMINI_LLM_TEMPERATURE
 from src.domain.entities import ResumeData
 from src.ports.llm_extractor import ExtractionError, LLMExtractor
 
@@ -60,13 +59,21 @@ Rules:
 
 
 class GeminiLLMExtractor(LLMExtractor):
+    """Extract structured ResumeData from raw text using Google Gemini."""
 
     def __init__(
         self,
-        model:       str   = GEMINI_LLM_MODEL,
-        temperature: float = GEMINI_LLM_TEMPERATURE,
-        api_key:     str   = GEMINI_API_KEY,
+        api_key: str,
+        model: str = "gemini-2.5-flash-lite",
+        temperature: float = 0,
     ) -> None:
+        """Initialize with API key, model, and temperature.
+        
+        Args:
+            api_key: Google Gemini API key (required)
+            model: Gemini model name (default: gemini-2.5-flash-lite)
+            temperature: Sampling temperature (default: 0)
+        """
         llm = ChatGoogleGenerativeAI(
             model=model,
             temperature=temperature,

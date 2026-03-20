@@ -11,7 +11,7 @@ import aiofiles
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
 from src.adapters import BatchProcessor
-from src.domain.config import BATCH_MAX_FILES, SUPPORTED_EXTENSIONS, UPLOAD_DIR
+from src.drivers.config import BATCH_MAX_FILES, SUPPORTED_EXTENSIONS, UPLOAD_DIR
 from src.drivers.api.dependencies import get_batch_processor, get_job_repo
 from src.drivers.api.job_runner import run_batch_job
 from src.drivers.api.schemas import BatchStatusResponse, BatchUploadResponse

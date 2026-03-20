@@ -14,7 +14,6 @@ import logging
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-from src.domain.config import OPENAI_LLM_MODEL, OPENAI_LLM_TEMPERATURE
 from src.domain.entities import ResumeData
 from src.ports.llm_extractor import ExtractionError, LLMExtractor
 
@@ -53,12 +52,19 @@ Rules:
 
 
 class OpenAILLMExtractor(LLMExtractor):
+    """Extract structured ResumeData from raw text using OpenAI."""
 
     def __init__(
         self,
-        model:       str = OPENAI_LLM_MODEL,
-        temperature: int = OPENAI_LLM_TEMPERATURE,
+        model: str = "gpt-4o-mini",
+        temperature: int = 0,
     ) -> None:
+        """Initialize with model and temperature.
+        
+        Args:
+            model: OpenAI model name (default: gpt-4o-mini)
+            temperature: Sampling temperature (default: 0)
+        """
         self._chain = _PROMPT | ChatOpenAI(model=model, temperature=temperature)
 
     def extract(self, raw_text: str) -> ResumeData:

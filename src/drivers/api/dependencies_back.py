@@ -43,12 +43,12 @@ from src.adapters import (
     RetrievalPipeline,
     SectionChunker,
 )
-from src.domain.config import (
+from src.drivers.config import (
     CHROMA_COLLECTION,
     CHROMA_HOST,
     CHROMA_PORT,
     CHROMA_SERVER_TOKEN,
-    EMBEDDING_MODEL,
+    OPEN_AI_EMBEDDING_MODEL,
     RERANK_FETCH_K,
     SUPPORTED_EXTENSIONS,
 )
@@ -149,12 +149,12 @@ from src.adapters import (
     OpenAILLMExtractor,
     SectionChunker,
 )
-from src.domain.config import (
+from src.drivers.config import (
     CHROMA_COLLECTION,
     CHROMA_HOST,
     CHROMA_PORT,
     CHROMA_SERVER_TOKEN,
-    EMBEDDING_MODEL,
+    OPEN_AI_EMBEDDING_MODEL,
     SUPPORTED_EXTENSIONS,
 )
 

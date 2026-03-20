@@ -43,12 +43,20 @@ from src.adapters import (
     RetrievalPipeline,
     SectionChunker,
 )
-from src.domain.config import (
+from src.drivers.config import (
+    BATCH_MAX_WORKERS,
     CHROMA_COLLECTION,
     CHROMA_HOST,
     CHROMA_PORT,
     CHROMA_SERVER_TOKEN,
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    COHERE_API_KEY,
+    COHERE_RERANK_MODEL,
     GEMINI_EMBEDDING_MODEL,
+    GEMINI_LLM_MODEL,
+    GEMINI_LLM_TEMPERATURE,
+    GEMINI_API_KEY,
     RERANK_FETCH_K,
     SUPPORTED_EXTENSIONS,
 )
@@ -69,14 +77,16 @@ def get_vector_store() -> ChromaHttpVectorStore:
 
 @lru_cache(maxsize=1)
 def get_reranker() -> CohereReranker:
+    """Reranker: Cohere API (requires COHERE_API_KEY).
+    
+    Swap to CrossEncoderReranker for local, free alternative:
+        from src.adapters import CrossEncoderReranker
+        return CrossEncoderReranker()
     """
-    Default: local cross-encoder (free, no API key needed).
-    Swap to CohereReranker for higher quality at the cost of an API call:
-
-        from src.adapters import CohereReranker
-        return CohereReranker()
-    """
-    return CohereReranker()
+    return CohereReranker(
+        api_key=COHERE_API_KEY,
+        model=COHERE_RERANK_MODEL,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -91,11 +101,22 @@ def get_retrieval_pipeline() -> RetrievalPipeline:
 
 @lru_cache(maxsize=1)
 def get_pipeline() -> LangGraphPipeline:
+    """Resume processing pipeline with all ports injected."""
     return LangGraphPipeline(
-        loader=       LangChainDocumentLoader(),
-        extractor=    GeminiLLMExtractor(),
-        chunker=      SectionChunker(),
-        vector_store= get_vector_store(),
+        loader=LangChainDocumentLoader(
+            supported_extensions=set(SUPPORTED_EXTENSIONS),
+        ),
+        extractor=GeminiLLMExtractor(
+            api_key=GEMINI_API_KEY,
+            model=GEMINI_LLM_MODEL,
+            temperature=GEMINI_LLM_TEMPERATURE,
+        ),
+        chunker=SectionChunker(
+            chunk_size=CHUNK_SIZE,
+            chunk_overlap=CHUNK_OVERLAP,
+        ),
+        vector_store=get_vector_store(),
+        supported_extensions=set(SUPPORTED_EXTENSIONS),
     )
 
 
@@ -106,7 +127,12 @@ def get_job_repo() -> InMemoryJobRepository:
 
 @lru_cache(maxsize=1)
 def get_batch_processor() -> BatchProcessor:
-    return BatchProcessor(pipeline=get_pipeline())
+    """Batch processor with thread pool configuration."""
+    return BatchProcessor(
+        pipeline=get_pipeline(),
+        max_workers=BATCH_MAX_WORKERS,
+        supported_extensions=set(SUPPORTED_EXTENSIONS),
+    )
 
 
 # ── Request helpers ────────────────────────────────────────────────────────

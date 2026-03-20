@@ -15,15 +15,24 @@ from langchain_core.documents import Document as LCDocument
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 
-from src.domain.config import OPEN_AI_EMBEDDING_MODEL, VECTORSTORE_PATH
 from src.ports.vector_store import Chunk, SearchResult, VectorStore
 
 
 class OpenAIVectorStore(VectorStore):
 
-    def __init__(self, persist_dir: str = str(VECTORSTORE_PATH)) -> None:
-        self._embedder = OpenAIEmbeddings(model=OPEN_AI_EMBEDDING_MODEL)
+    def __init__(
+        self,
+        embedding_model: str = "text-embedding-3-small",
+        persist_dir: str = "./resume_chroma_db",
+    ) -> None:
+        """Initialize OpenAI vector store.
+        
+        Args:
+            embedding_model: OpenAI embedding model (default: text-embedding-3-small)
+            persist_dir: Persistency directory for Chroma (default: ./resume_chroma_db)
+        """
         self._persist_dir = persist_dir
+        self._embedder = OpenAIEmbeddings(model=embedding_model)
 
     # ── VectorStore interface ──────────────────────────────────────────────
 

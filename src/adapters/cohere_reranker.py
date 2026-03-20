@@ -20,7 +20,6 @@ from typing import List
 
 import cohere
 
-from src.domain.config import COHERE_API_KEY, COHERE_RERANK_MODEL
 from src.ports.reranker import RankedResult, Reranker
 from src.ports.vector_store import SearchResult
 
@@ -37,11 +36,17 @@ class CohereReranker(Reranker):
 
     def __init__(
         self,
-        api_key: str = COHERE_API_KEY,
-        model:   str = COHERE_RERANK_MODEL,
+        api_key: str,
+        model: str = "rerank-english-v3.0",
     ) -> None:
+        """Initialize with API key and model.
+        
+        Args:
+            api_key: Cohere API key (required)
+            model: Cohere rerank model (default: rerank-english-v3.0)
+        """
         self._client = cohere.Client(api_key=api_key)
-        self._model  = model
+        self._model = model
         log.info("CohereReranker initialised  model=%s", model)
 
     def rerank(

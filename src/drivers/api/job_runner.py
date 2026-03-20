@@ -15,8 +15,8 @@ from typing import List
 
 from src.adapters.batch_processor import BatchProcessor
 from src.adapters.langgraph_pipeline import LangGraphPipeline
-from src.domain.config import VECTORSTORE_PATH
 from src.domain.entities import BatchSummary, ProcessingResult
+from src.drivers.config import VECTORSTORE_PATH
 from src.ports.job_repository import Job, JobRepository
 
 log = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ def run_single_job(
                     "jobs_count":       result.jobs_count,
                     "chunks_stored":    result.chunks_count,
                     "duration_seconds": result.duration_seconds,
-                    "resume_data":      rd.model_dump() if rd else None,
+                    "resume_data":      rd.to_dict() if rd else None,
                     "status_log":       result.status_log,
                 },
             )
